@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"sort"
 	"testing"
 
 	"github.com/adamrothman/shalott/internal/mirror"
@@ -161,12 +160,6 @@ func TestDiff_TargetDirNotExist(t *testing.T) {
 	if len(result.New) != 1 {
 		t.Errorf("expected 1 new, got %d", len(result.New))
 	}
-}
-
-func sortEntries(entries []mirror.Entry) {
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].TargetPath < entries[j].TargetPath
-	})
 }
 
 func TestCreate_NewSymlink(t *testing.T) {

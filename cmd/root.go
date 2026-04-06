@@ -63,14 +63,12 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	// Create target directories
 	for _, m := range cfg.Mirrors {
 		if err := os.MkdirAll(m.Target, 0o755); err != nil {
 			return fmt.Errorf("creating target directory %s: %w", m.Target, err)
 		}
 	}
 
-	// Warn about unreachable sources
 	for _, m := range cfg.Mirrors {
 		if _, err := os.Stat(m.Source); err != nil {
 			logger.Warn("source not reachable at startup",
@@ -113,15 +111,12 @@ func runDaemon(cfg *config.Config, dryRun bool, logger *slog.Logger) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Signal handling: SIGTERM/SIGINT for shutdown
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
 
-	// Signal handling: SIGHUP for forced scan
 	sighupCh := make(chan os.Signal, 1)
 	signal.Notify(sighupCh, syscall.SIGHUP)
 
-	// Start mirror goroutines
 	var wg sync.WaitGroup
 	forceScanChs := make([]chan struct{}, len(cfg.Mirrors))
 

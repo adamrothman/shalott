@@ -96,8 +96,6 @@ func (m *Mirror) syncPath(ctx context.Context, sourceDir, targetDir string, path
 		)
 	}
 
-	prefixDir := filepath.Join(m.Config.Target, pathCfg.Prefix)
-
 	for _, e := range diff.New {
 		if err := Create(e, m.DryRun, m.Logger); err != nil {
 			m.Logger.Error("failed to create symlink",
@@ -112,7 +110,7 @@ func (m *Mirror) syncPath(ctx context.Context, sourceDir, targetDir string, path
 	}
 
 	for _, e := range diff.Orphan {
-		if err := Prune(e, prefixDir, m.DryRun, m.Logger); err != nil {
+		if err := Prune(e, targetDir, m.DryRun, m.Logger); err != nil {
 			m.Logger.Error("failed to prune symlink",
 				"mirror", m.Config.Name,
 				"target", e.TargetPath,
@@ -136,13 +134,7 @@ func (m *Mirror) Run(ctx context.Context, forceScan <-chan struct{}) {
 		"poll_interval", m.Config.PollInterval.Duration,
 	)
 
-	result := m.RunOnce(ctx)
-	m.Logger.Debug("initial scan complete",
-		"mirror", m.Config.Name,
-		"created", result.Created,
-		"pruned", result.Pruned,
-		"errors", result.Errors,
-	)
+	m.logScanResult("initial scan complete", m.RunOnce(ctx))
 
 	ticker := time.NewTicker(m.Config.PollInterval.Duration)
 	defer ticker.Stop()
@@ -153,23 +145,20 @@ func (m *Mirror) Run(ctx context.Context, forceScan <-chan struct{}) {
 			m.Logger.Info("stopping mirror", "mirror", m.Config.Name)
 			return
 		case <-ticker.C:
-			result := m.RunOnce(ctx)
-			m.Logger.Debug("scan complete",
-				"mirror", m.Config.Name,
-				"created", result.Created,
-				"pruned", result.Pruned,
-				"errors", result.Errors,
-			)
+			m.logScanResult("scan complete", m.RunOnce(ctx))
 		case <-forceScan:
 			m.Logger.Info("forced scan triggered", "mirror", m.Config.Name)
-			result := m.RunOnce(ctx)
-			m.Logger.Debug("forced scan complete",
-				"mirror", m.Config.Name,
-				"created", result.Created,
-				"pruned", result.Pruned,
-				"errors", result.Errors,
-			)
+			m.logScanResult("forced scan complete", m.RunOnce(ctx))
 			ticker.Reset(m.Config.PollInterval.Duration)
 		}
 	}
+}
+
+func (m *Mirror) logScanResult(msg string, result ScanResult) {
+	m.Logger.Debug(msg,
+		"mirror", m.Config.Name,
+		"created", result.Created,
+		"pruned", result.Pruned,
+		"errors", result.Errors,
+	)
 }
