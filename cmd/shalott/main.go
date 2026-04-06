@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
-	"flag"
-	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+
+	"github.com/spf13/cobra"
 
 	"github.com/adamrothman/shalott/internal/config"
 	"github.com/adamrothman/shalott/internal/mirror"
@@ -17,32 +17,37 @@ import (
 var version = "dev"
 
 func main() {
-	os.Exit(run())
-}
-
-func run() int {
-	configPath := flag.String("config", "/etc/shalott/config.yaml", "path to config file")
-	once := flag.Bool("once", false, "run a single scan and exit")
-	dryRun := flag.Bool("dry-run", false, "log intended changes without executing")
-	debug := flag.Bool("debug", false, "enable debug logging")
-	showVersion := flag.Bool("version", false, "print version and exit")
-	flag.Parse()
-
-	if *showVersion {
-		fmt.Println("shalott", version)
-		return 0
+	rootCmd := &cobra.Command{
+		Use:     "shalott",
+		Short:   "Symlink mirror daemon",
+		Long:    "A polling daemon that maintains a local symlink tree mirroring a remote source, generating inotify events for watching applications.",
+		Version: version,
+		RunE:    runRoot,
 	}
 
+	rootCmd.Flags().StringP("config", "c", "/etc/shalott/config.yaml", "path to config file")
+	rootCmd.Flags().Bool("once", false, "run a single scan and exit")
+	rootCmd.Flags().BoolP("dry-run", "n", false, "log intended changes without executing")
+	rootCmd.Flags().Bool("debug", false, "enable debug logging")
+
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
+}
+
+func runRoot(cmd *cobra.Command, args []string) error {
+	debug, _ := cmd.Flags().GetBool("debug")
 	level := slog.LevelInfo
-	if *debug {
+	if debug {
 		level = slog.LevelDebug
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
 
-	cfg, err := config.Load(*configPath)
+	configPath, _ := cmd.Flags().GetString("config")
+	cfg, err := config.Load(configPath)
 	if err != nil {
 		logger.Error("failed to load config", "error", err)
-		return 2
+		os.Exit(2)
 	}
 
 	// Create target directories
@@ -52,7 +57,7 @@ func run() int {
 				"target", m.Target,
 				"error", err,
 			)
-			return 2
+			os.Exit(2)
 		}
 	}
 
@@ -67,10 +72,14 @@ func run() int {
 		}
 	}
 
-	if *once {
-		return runOnce(cfg, *dryRun, logger)
+	once, _ := cmd.Flags().GetBool("once")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+	if once {
+		os.Exit(runOnce(cfg, dryRun, logger))
 	}
-	return runDaemon(cfg, *dryRun, logger)
+	os.Exit(runDaemon(cfg, dryRun, logger))
+	return nil
 }
 
 func runOnce(cfg *config.Config, dryRun bool, logger *slog.Logger) int {
