@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"context"
@@ -40,6 +40,11 @@ func init() {
 	rootCmd.Flags().BoolVar(&once, "once", false, "run a single scan and exit")
 	rootCmd.Flags().BoolVarP(&dryRun, "dry-run", "n", false, "log intended changes without executing")
 	rootCmd.Flags().BoolVar(&debug, "debug", false, "enable debug logging")
+}
+
+// Execute runs the root command and returns any error.
+func Execute() error {
+	return rootCmd.Execute()
 }
 
 func newLogger() *slog.Logger {
