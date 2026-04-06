@@ -40,7 +40,7 @@ func TestIntegration_FullCycle(t *testing.T) {
 		Name:     "music",
 		Source:   sourceDir,
 		Target:   targetDir,
-		Debounce: config.Duration{Duration: time.Minute},
+		Debounce: time.Minute,
 		Paths: []config.Path{
 			{Prefix: "Artists", Depth: 2},
 			{Prefix: "Soundtracks", Depth: 1},

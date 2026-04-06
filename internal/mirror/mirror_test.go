@@ -28,7 +28,7 @@ func TestRunOnce_CreatesSymlinks(t *testing.T) {
 			Name:     "test",
 			Source:   sourceDir,
 			Target:   targetDir,
-			Debounce: config.Duration{Duration: time.Minute},
+			Debounce: time.Minute,
 			Paths: []config.Path{
 				{Prefix: "Robyn", Depth: 1},
 			},
@@ -140,7 +140,7 @@ func TestRunOnce_DryRun(t *testing.T) {
 			Name:     "test",
 			Source:   sourceDir,
 			Target:   targetDir,
-			Debounce: config.Duration{Duration: time.Minute},
+			Debounce: time.Minute,
 			Paths: []config.Path{
 				{Prefix: "", Depth: 1},
 			},
@@ -170,7 +170,7 @@ func TestRun_StopsOnContextCancel(t *testing.T) {
 			Name:         "test",
 			Source:       sourceDir,
 			Target:       targetDir,
-			PollInterval: config.Duration{Duration: time.Hour},
+			PollInterval: time.Hour,
 			Paths: []config.Path{
 				{Prefix: "", Depth: 1},
 			},
@@ -206,7 +206,7 @@ func TestRun_ForceScan(t *testing.T) {
 			Name:         "test",
 			Source:       sourceDir,
 			Target:       targetDir,
-			PollInterval: config.Duration{Duration: time.Hour},
+			PollInterval: time.Hour,
 			Paths: []config.Path{
 				{Prefix: "", Depth: 1},
 			},

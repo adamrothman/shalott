@@ -49,11 +49,11 @@ mirrors:
 		t.Fatalf("unexpected error: %v", err)
 	}
 	m := cfg.Mirrors[0]
-	if m.PollInterval.Duration != 30*time.Second {
-		t.Errorf("expected poll_interval 30s, got %v", m.PollInterval.Duration)
+	if m.PollInterval != 30*time.Second {
+		t.Errorf("expected poll_interval 30s, got %v", m.PollInterval)
 	}
-	if m.Debounce.Duration != 2*time.Minute {
-		t.Errorf("expected debounce 2m, got %v", m.Debounce.Duration)
+	if m.Debounce != 2*time.Minute {
+		t.Errorf("expected debounce 2m, got %v", m.Debounce)
 	}
 	if len(m.Paths) != 1 || m.Paths[0].Prefix != "" || m.Paths[0].Depth != 1 {
 		t.Errorf("expected default paths [{prefix:'', depth:1}], got %+v", m.Paths)
@@ -77,11 +77,11 @@ mirrors:
 		t.Fatalf("unexpected error: %v", err)
 	}
 	m := cfg.Mirrors[0]
-	if m.PollInterval.Duration != 5*time.Minute {
-		t.Errorf("expected poll_interval 5m, got %v", m.PollInterval.Duration)
+	if m.PollInterval != 5*time.Minute {
+		t.Errorf("expected poll_interval 5m, got %v", m.PollInterval)
 	}
-	if m.Debounce.Duration != 30*time.Second {
-		t.Errorf("expected debounce 30s, got %v", m.Debounce.Duration)
+	if m.Debounce != 30*time.Second {
+		t.Errorf("expected debounce 30s, got %v", m.Debounce)
 	}
 }
 

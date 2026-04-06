@@ -61,7 +61,7 @@ func (m *Mirror) RunOnce(ctx context.Context) ScanResult {
 func (m *Mirror) syncPath(ctx context.Context, sourceDir, targetDir string, pathCfg config.Path, now time.Time) ScanResult {
 	var result ScanResult
 
-	scanned, err := ScanSource(ctx, sourceDir, pathCfg.Depth, m.Config.Debounce.Duration, now)
+	scanned, err := ScanSource(ctx, sourceDir, pathCfg.Depth, m.Config.Debounce, now)
 	if err != nil {
 		m.Logger.Error("scan failed, skipping path",
 			"mirror", m.Config.Name,
@@ -131,12 +131,12 @@ func (m *Mirror) syncPath(ctx context.Context, sourceDir, targetDir string, path
 func (m *Mirror) Run(ctx context.Context, forceScan <-chan struct{}) {
 	m.Logger.Info("starting mirror",
 		"mirror", m.Config.Name,
-		"poll_interval", m.Config.PollInterval.Duration,
+		"poll_interval", m.Config.PollInterval,
 	)
 
 	m.logScanResult("initial scan complete", m.RunOnce(ctx))
 
-	ticker := time.NewTicker(m.Config.PollInterval.Duration)
+	ticker := time.NewTicker(m.Config.PollInterval)
 	defer ticker.Stop()
 
 	for {
@@ -149,7 +149,7 @@ func (m *Mirror) Run(ctx context.Context, forceScan <-chan struct{}) {
 		case <-forceScan:
 			m.Logger.Info("forced scan triggered", "mirror", m.Config.Name)
 			m.logScanResult("forced scan complete", m.RunOnce(ctx))
-			ticker.Reset(m.Config.PollInterval.Duration)
+			ticker.Reset(m.Config.PollInterval)
 		}
 	}
 }

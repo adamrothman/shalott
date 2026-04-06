@@ -18,36 +18,18 @@ type Config struct {
 
 // Mirror defines a single source-to-target mirroring configuration.
 type Mirror struct {
-	Name         string   `yaml:"name" validate:"required"`
-	Source       string   `yaml:"source" validate:"required"`
-	Target       string   `yaml:"target" validate:"required"`
-	PollInterval Duration `yaml:"poll_interval"`
-	Debounce     Duration `yaml:"debounce"`
-	Paths        []Path   `yaml:"paths" validate:"dive"`
+	Name         string        `yaml:"name" validate:"required"`
+	Source       string        `yaml:"source" validate:"required"`
+	Target       string        `yaml:"target" validate:"required"`
+	PollInterval time.Duration `yaml:"poll_interval"`
+	Debounce     time.Duration `yaml:"debounce"`
+	Paths        []Path        `yaml:"paths" validate:"dive"`
 }
 
 // Path defines a prefix and depth within a mirror.
 type Path struct {
 	Prefix string `yaml:"prefix"`
 	Depth  int    `yaml:"depth" validate:"gt=0"`
-}
-
-// Duration wraps time.Duration for YAML unmarshaling from strings like "30s".
-type Duration struct {
-	time.Duration
-}
-
-func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
-	var s string
-	if err := value.Decode(&s); err != nil {
-		return err
-	}
-	dur, err := time.ParseDuration(s)
-	if err != nil {
-		return err
-	}
-	d.Duration = dur
-	return nil
 }
 
 // Load reads and parses a config file from disk.
@@ -84,11 +66,11 @@ func Parse(data []byte) (*Config, error) {
 func applyDefaults(c *Config) {
 	for i := range c.Mirrors {
 		m := &c.Mirrors[i]
-		if m.PollInterval.Duration == 0 {
-			m.PollInterval.Duration = 30 * time.Second
+		if m.PollInterval == 0 {
+			m.PollInterval = 30 * time.Second
 		}
-		if m.Debounce.Duration == 0 {
-			m.Debounce.Duration = 2 * time.Minute
+		if m.Debounce == 0 {
+			m.Debounce = 2 * time.Minute
 		}
 		if m.Paths == nil {
 			m.Paths = []Path{{Prefix: "", Depth: 1}}
