@@ -1,0 +1,13 @@
+[Unit]
+Description=shalott symlink mirror daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/shalott --config /etc/shalott/config.yaml
+Restart=on-failure
+RestartSec=10
+User=root
+
+[Install]
+WantedBy=multi-user.target
