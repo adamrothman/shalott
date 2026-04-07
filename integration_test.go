@@ -3,7 +3,6 @@
 package main_test
 
 import (
-	"context"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -36,7 +35,7 @@ func TestIntegration_FullCycle(t *testing.T) {
 	past := time.Now().Add(-10 * time.Minute)
 	setMtimeRecursive(t, sourceDir, past)
 
-	cfg := config.Mirror{
+	cfg := &config.Mirror{
 		Name:     "music",
 		Source:   sourceDir,
 		Target:   targetDir,
@@ -51,9 +50,9 @@ func TestIntegration_FullCycle(t *testing.T) {
 	m := &mirror.Mirror{Config: cfg, Logger: logger}
 
 	// --- First scan: create all symlinks ---
-	result := m.RunOnce(context.Background())
-	if result.Errors != 0 {
-		t.Fatalf("expected 0 errors, got %d", result.Errors)
+	result := m.RunOnce(t.Context())
+	if len(result.Errors) != 0 {
+		t.Fatalf("expected 0 errors, got %d", len(result.Errors))
 	}
 	if result.Created != 5 {
 		t.Fatalf("expected 5 created, got %d", result.Created)
@@ -77,7 +76,7 @@ func TestIntegration_FullCycle(t *testing.T) {
 	assertRealDir(t, filepath.Join(targetDir, "Soundtracks"))
 
 	// --- Second scan: no changes ---
-	result = m.RunOnce(context.Background())
+	result = m.RunOnce(t.Context())
 	if result.Created != 0 || result.Pruned != 0 {
 		t.Errorf("expected no changes, got created=%d pruned=%d", result.Created, result.Pruned)
 	}
@@ -88,7 +87,7 @@ func TestIntegration_FullCycle(t *testing.T) {
 	os.Chtimes(filepath.Join(sourceDir, "Artists", "Robyn", "Body Talk"), past, past)
 
 	// --- Third scan: should prune Honey, create Body Talk ---
-	result = m.RunOnce(context.Background())
+	result = m.RunOnce(t.Context())
 	if result.Created != 1 {
 		t.Errorf("expected 1 created, got %d", result.Created)
 	}
@@ -107,7 +106,7 @@ func TestIntegration_FullCycle(t *testing.T) {
 	os.RemoveAll(filepath.Join(sourceDir, "Artists", "Charlie Puth"))
 
 	// --- Fourth scan: should prune and clean up empty Charlie Puth dir ---
-	result = m.RunOnce(context.Background())
+	result = m.RunOnce(t.Context())
 	if result.Pruned != 1 {
 		t.Errorf("expected 1 pruned, got %d", result.Pruned)
 	}

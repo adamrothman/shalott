@@ -1,7 +1,6 @@
 package mirror_test
 
 import (
-	"context"
 	"io"
 	"log/slog"
 	"os"
@@ -21,7 +20,7 @@ func TestDiff_AllNew(t *testing.T) {
 		filepath.Join(sourceDir, "Robyn", "Sexistential"),
 	}
 
-	result, err := mirror.Diff(context.Background(), sourceDir, targetDir, scanned, 2)
+	result, err := mirror.Diff(t.Context(), sourceDir, targetDir, scanned, 2)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -51,7 +50,7 @@ func TestDiff_AllValid(t *testing.T) {
 
 	scanned := []string{filepath.Join(sourceDir, "Robyn", "Honey")}
 
-	result, err := mirror.Diff(context.Background(), sourceDir, targetDir, scanned, 2)
+	result, err := mirror.Diff(t.Context(), sourceDir, targetDir, scanned, 2)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,7 +74,7 @@ func TestDiff_Orphans(t *testing.T) {
 	// Empty scan result — nothing in source
 	var scanned []string
 
-	result, err := mirror.Diff(context.Background(), sourceDir, targetDir, scanned, 2)
+	result, err := mirror.Diff(t.Context(), sourceDir, targetDir, scanned, 2)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -98,7 +97,7 @@ func TestDiff_ForeignEntry(t *testing.T) {
 
 	scanned := []string{filepath.Join(sourceDir, "real")}
 
-	result, err := mirror.Diff(context.Background(), sourceDir, targetDir, scanned, 1)
+	result, err := mirror.Diff(t.Context(), sourceDir, targetDir, scanned, 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -129,7 +128,7 @@ func TestDiff_MixedState(t *testing.T) {
 		filepath.Join(sourceDir, "existing-album"),
 	}
 
-	result, err := mirror.Diff(context.Background(), sourceDir, targetDir, scanned, 1)
+	result, err := mirror.Diff(t.Context(), sourceDir, targetDir, scanned, 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -152,7 +151,7 @@ func TestDiff_TargetDirNotExist(t *testing.T) {
 
 	scanned := []string{filepath.Join(sourceDir, "album")}
 
-	result, err := mirror.Diff(context.Background(), sourceDir, targetDir, scanned, 1)
+	result, err := mirror.Diff(t.Context(), sourceDir, targetDir, scanned, 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

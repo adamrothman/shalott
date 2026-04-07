@@ -24,7 +24,7 @@ func TestRunOnce_CreatesSymlinks(t *testing.T) {
 	os.Chtimes(filepath.Join(sourceDir, "Robyn", "Sexistential"), past, past)
 
 	m := &mirror.Mirror{
-		Config: config.Mirror{
+		Config: &config.Mirror{
 			Name:     "test",
 			Source:   sourceDir,
 			Target:   targetDir,
@@ -36,13 +36,13 @@ func TestRunOnce_CreatesSymlinks(t *testing.T) {
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 
-	result := m.RunOnce(context.Background())
+	result := m.RunOnce(t.Context())
 
 	if result.Created != 2 {
 		t.Errorf("expected 2 created, got %d", result.Created)
 	}
-	if result.Errors != 0 {
-		t.Errorf("expected 0 errors, got %d", result.Errors)
+	if len(result.Errors) != 0 {
+		t.Errorf("expected 0 errors, got %d", len(result.Errors))
 	}
 
 	// Verify symlinks exist
@@ -70,7 +70,7 @@ func TestRunOnce_PrunesOrphans(t *testing.T) {
 	os.Symlink("/nonexistent", orphan)
 
 	m := &mirror.Mirror{
-		Config: config.Mirror{
+		Config: &config.Mirror{
 			Name:   "test",
 			Source: sourceDir,
 			Target: targetDir,
@@ -84,7 +84,7 @@ func TestRunOnce_PrunesOrphans(t *testing.T) {
 	// Create the prefix dir in source so health check passes
 	mkdirs(t, sourceDir, []string{"prefix"})
 
-	result := m.RunOnce(context.Background())
+	result := m.RunOnce(t.Context())
 
 	if result.Pruned != 1 {
 		t.Errorf("expected 1 pruned, got %d", result.Pruned)
@@ -104,7 +104,7 @@ func TestRunOnce_SourceUnreachable(t *testing.T) {
 	os.Symlink("/whatever", existing)
 
 	m := &mirror.Mirror{
-		Config: config.Mirror{
+		Config: &config.Mirror{
 			Name:   "test",
 			Source: "/nonexistent/source",
 			Target: targetDir,
@@ -115,10 +115,10 @@ func TestRunOnce_SourceUnreachable(t *testing.T) {
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 
-	result := m.RunOnce(context.Background())
+	result := m.RunOnce(t.Context())
 
-	if result.Errors != 1 {
-		t.Errorf("expected 1 error, got %d", result.Errors)
+	if len(result.Errors) != 1 {
+		t.Errorf("expected 1 error, got %d", len(result.Errors))
 	}
 
 	// Existing symlink should be preserved (no pruning when source is down)
@@ -136,7 +136,7 @@ func TestRunOnce_DryRun(t *testing.T) {
 	os.Chtimes(filepath.Join(sourceDir, "album"), past, past)
 
 	m := &mirror.Mirror{
-		Config: config.Mirror{
+		Config: &config.Mirror{
 			Name:     "test",
 			Source:   sourceDir,
 			Target:   targetDir,
@@ -149,7 +149,7 @@ func TestRunOnce_DryRun(t *testing.T) {
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 
-	result := m.RunOnce(context.Background())
+	result := m.RunOnce(t.Context())
 
 	if result.Created != 1 {
 		t.Errorf("expected 1 created (dry run), got %d", result.Created)
@@ -166,7 +166,7 @@ func TestRun_StopsOnContextCancel(t *testing.T) {
 	targetDir := t.TempDir()
 
 	m := &mirror.Mirror{
-		Config: config.Mirror{
+		Config: &config.Mirror{
 			Name:         "test",
 			Source:       sourceDir,
 			Target:       targetDir,
@@ -178,10 +178,10 @@ func TestRun_StopsOnContextCancel(t *testing.T) {
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})
 	go func() {
-		m.Run(ctx, nil)
+		m.Run(ctx, mirror.NewBroadcast())
 		close(done)
 	}()
 
@@ -202,7 +202,7 @@ func TestRun_ForceScan(t *testing.T) {
 	targetDir := t.TempDir()
 
 	m := &mirror.Mirror{
-		Config: config.Mirror{
+		Config: &config.Mirror{
 			Name:         "test",
 			Source:       sourceDir,
 			Target:       targetDir,
@@ -214,10 +214,10 @@ func TestRun_ForceScan(t *testing.T) {
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	forceScan := make(chan struct{}, 1)
+	forceScan := mirror.NewBroadcast()
 	done := make(chan struct{})
 	go func() {
 		m.Run(ctx, forceScan)
@@ -229,7 +229,7 @@ func TestRun_ForceScan(t *testing.T) {
 
 	// Add a new directory and force scan
 	mkdirs(t, sourceDir, []string{"new-album"})
-	forceScan <- struct{}{}
+	forceScan.Notify()
 
 	// Wait for forced scan to complete
 	time.Sleep(50 * time.Millisecond)

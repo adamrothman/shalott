@@ -28,7 +28,7 @@ func TestScanSource_Depth1(t *testing.T) {
 		"Soundtracks/Interstellar",
 	})
 
-	got, err := mirror.ScanSource(context.Background(), root, 1, 0, time.Now())
+	got, err := mirror.ScanSource(t.Context(), root, 1, 0, time.Now())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -45,7 +45,7 @@ func TestScanSource_Depth2(t *testing.T) {
 		"Charlie Puth/Whatever's Clever",
 	})
 
-	got, err := mirror.ScanSource(context.Background(), root, 2, 0, time.Now())
+	got, err := mirror.ScanSource(t.Context(), root, 2, 0, time.Now())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestScanSource_SkipsSymlinks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := mirror.ScanSource(context.Background(), root, 1, 0, time.Now())
+	got, err := mirror.ScanSource(t.Context(), root, 1, 0, time.Now())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestScanSource_SkipsSymlinksAtIntermediateDepth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := mirror.ScanSource(context.Background(), root, 2, 0, time.Now())
+	got, err := mirror.ScanSource(t.Context(), root, 2, 0, time.Now())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestScanSource_Debounce(t *testing.T) {
 
 	// new-dir mtime is ~now (just created)
 
-	got, err := mirror.ScanSource(context.Background(), root, 1, 5*time.Minute, now)
+	got, err := mirror.ScanSource(t.Context(), root, 1, 5*time.Minute, now)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestScanSource_ContextCancellation(t *testing.T) {
 	root := t.TempDir()
 	mkdirs(t, root, []string{"a", "b", "c", "d", "e"})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // cancel immediately
 
 	_, err := mirror.ScanSource(ctx, root, 1, 0, time.Now())
@@ -135,7 +135,7 @@ func TestScanSource_ContextCancellation(t *testing.T) {
 func TestScanSource_EmptyDir(t *testing.T) {
 	root := t.TempDir()
 
-	got, err := mirror.ScanSource(context.Background(), root, 1, 0, time.Now())
+	got, err := mirror.ScanSource(t.Context(), root, 1, 0, time.Now())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestScanSource_EmptyDir(t *testing.T) {
 }
 
 func TestScanSource_NonexistentDir(t *testing.T) {
-	_, err := mirror.ScanSource(context.Background(), "/nonexistent", 1, 0, time.Now())
+	_, err := mirror.ScanSource(t.Context(), "/nonexistent", 1, 0, time.Now())
 	if err == nil {
 		t.Fatal("expected error for nonexistent directory")
 	}

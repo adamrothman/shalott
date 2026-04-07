@@ -13,12 +13,12 @@ import (
 
 // Config is the top-level shalott configuration.
 type Config struct {
-	Mirrors []Mirror `yaml:"mirrors" validate:"required,min=1,dive"`
+	Mirrors map[string]*Mirror `yaml:"mirrors" validate:"required,min=1,dive"`
 }
 
 // Mirror defines a single source-to-target mirroring configuration.
 type Mirror struct {
-	Name         string        `yaml:"name" validate:"required"`
+	Name         string        `yaml:"-"`
 	Source       string        `yaml:"source" validate:"required"`
 	Target       string        `yaml:"target" validate:"required"`
 	PollInterval time.Duration `yaml:"poll_interval"`
@@ -48,6 +48,11 @@ func Parse(data []byte) (*Config, error) {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
 
+	// Populate Name from map keys
+	for name, m := range cfg.Mirrors {
+		m.Name = name
+	}
+
 	// Check empty prefixes before applying defaults
 	// (default paths use empty prefix which is valid)
 	if err := checkEmptyPrefixes(&cfg); err != nil {
@@ -64,8 +69,7 @@ func Parse(data []byte) (*Config, error) {
 }
 
 func applyDefaults(c *Config) {
-	for i := range c.Mirrors {
-		m := &c.Mirrors[i]
+	for _, m := range c.Mirrors {
 		if m.PollInterval == 0 {
 			m.PollInterval = 30 * time.Second
 		}
@@ -82,9 +86,6 @@ func validate(c *Config) error {
 	v := validator.New()
 	if err := v.Struct(c); err != nil {
 		return fmt.Errorf("config validation: %w", err)
-	}
-	if err := checkDuplicateNames(c); err != nil {
-		return err
 	}
 	if err := checkOverlaps(c); err != nil {
 		return err
@@ -106,21 +107,14 @@ func checkEmptyPrefixes(c *Config) error {
 	return nil
 }
 
-func checkDuplicateNames(c *Config) error {
-	seen := make(map[string]bool)
-	for _, m := range c.Mirrors {
-		if seen[m.Name] {
-			return fmt.Errorf("duplicate mirror name: %q", m.Name)
-		}
-		seen[m.Name] = true
-	}
-	return nil
-}
-
 func checkOverlaps(c *Config) error {
-	for i := 0; i < len(c.Mirrors); i++ {
-		for j := i + 1; j < len(c.Mirrors); j++ {
-			mi, mj := c.Mirrors[i], c.Mirrors[j]
+	mirrors := make([]*Mirror, 0, len(c.Mirrors))
+	for _, m := range c.Mirrors {
+		mirrors = append(mirrors, m)
+	}
+	for i := 0; i < len(mirrors); i++ {
+		for j := i + 1; j < len(mirrors); j++ {
+			mi, mj := mirrors[i], mirrors[j]
 			if pathsOverlap(mi.Source, mj.Source) {
 				return fmt.Errorf("mirrors %q and %q have overlapping sources: %s, %s",
 					mi.Name, mj.Name, mi.Source, mj.Source)

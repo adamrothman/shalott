@@ -14,12 +14,12 @@ import (
 type ScanResult struct {
 	Created int
 	Pruned  int
-	Errors  int
+	Errors  []error
 }
 
 // Mirror orchestrates scanning and syncing for a single mirror configuration.
 type Mirror struct {
-	Config config.Mirror
+	Config *config.Mirror
 	DryRun bool
 	Logger *slog.Logger
 }
@@ -35,7 +35,7 @@ func (m *Mirror) RunOnce(ctx context.Context) ScanResult {
 			"source", m.Config.Source,
 			"error", err,
 		)
-		result.Errors++
+		result.Errors = append(result.Errors, err)
 		return result
 	}
 
@@ -52,7 +52,7 @@ func (m *Mirror) RunOnce(ctx context.Context) ScanResult {
 		r := m.syncPath(ctx, sourceDir, targetDir, pathCfg, now)
 		result.Created += r.Created
 		result.Pruned += r.Pruned
-		result.Errors += r.Errors
+		result.Errors = append(result.Errors, r.Errors...)
 	}
 
 	return result
@@ -68,7 +68,7 @@ func (m *Mirror) syncPath(ctx context.Context, sourceDir, targetDir string, path
 			"prefix", pathCfg.Prefix,
 			"error", err,
 		)
-		result.Errors++
+		result.Errors = append(result.Errors, err)
 		return result
 	}
 
@@ -85,7 +85,7 @@ func (m *Mirror) syncPath(ctx context.Context, sourceDir, targetDir string, path
 			"prefix", pathCfg.Prefix,
 			"error", err,
 		)
-		result.Errors++
+		result.Errors = append(result.Errors, err)
 		return result
 	}
 
@@ -103,7 +103,7 @@ func (m *Mirror) syncPath(ctx context.Context, sourceDir, targetDir string, path
 				"target", e.TargetPath,
 				"error", err,
 			)
-			result.Errors++
+			result.Errors = append(result.Errors, err)
 			continue
 		}
 		result.Created++
@@ -116,7 +116,7 @@ func (m *Mirror) syncPath(ctx context.Context, sourceDir, targetDir string, path
 				"target", e.TargetPath,
 				"error", err,
 			)
-			result.Errors++
+			result.Errors = append(result.Errors, err)
 			continue
 		}
 		result.Pruned++
@@ -128,7 +128,7 @@ func (m *Mirror) syncPath(ctx context.Context, sourceDir, targetDir string, path
 // Run starts the daemon loop, scanning on the configured interval.
 // Runs an initial scan immediately, then on each ticker tick.
 // Returns when ctx is cancelled. Send on forceScan to trigger an immediate scan.
-func (m *Mirror) Run(ctx context.Context, forceScan <-chan struct{}) {
+func (m *Mirror) Run(ctx context.Context, forceScan *Broadcast) {
 	m.Logger.Info("starting mirror",
 		"mirror", m.Config.Name,
 		"poll_interval", m.Config.PollInterval,
@@ -146,7 +146,7 @@ func (m *Mirror) Run(ctx context.Context, forceScan <-chan struct{}) {
 			return
 		case <-ticker.C:
 			m.logScanResult("scan complete", m.RunOnce(ctx))
-		case <-forceScan:
+		case <-forceScan.Wait():
 			m.Logger.Info("forced scan triggered", "mirror", m.Config.Name)
 			m.logScanResult("forced scan complete", m.RunOnce(ctx))
 			ticker.Reset(m.Config.PollInterval)
@@ -159,6 +159,6 @@ func (m *Mirror) logScanResult(msg string, result ScanResult) {
 		"mirror", m.Config.Name,
 		"created", result.Created,
 		"pruned", result.Pruned,
-		"errors", result.Errors,
+		"errors", len(result.Errors),
 	)
 }

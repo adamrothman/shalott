@@ -32,7 +32,33 @@ var rootCmd = &cobra.Command{
 	Version:      version,
 	Args:         cobra.NoArgs,
 	SilenceUsage: true,
-	RunE:         runRoot,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		logger := newLogger()
+
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return fmt.Errorf("loading config: %w", err)
+		}
+
+		for _, m := range cfg.Mirrors {
+			if _, err := os.Stat(m.Source); err != nil {
+				logger.Warn("source not reachable at startup",
+					"mirror", m.Name,
+					"source", m.Source,
+					"error", err,
+				)
+			}
+			if err := os.MkdirAll(m.Target, 0o755); err != nil {
+				return fmt.Errorf("creating target directory %s: %w", m.Target, err)
+			}
+		}
+
+		ctx := cmd.Context()
+		if once {
+			return runOnce(ctx, cfg, dryRun, logger)
+		}
+		return runDaemon(ctx, cfg, dryRun, logger)
+	},
 }
 
 func init() {
@@ -48,45 +74,14 @@ func Execute() error {
 }
 
 func newLogger() *slog.Logger {
-	level := slog.LevelInfo
+	opts := &slog.HandlerOptions{Level: slog.LevelInfo}
 	if debug {
-		level = slog.LevelDebug
+		opts.Level = slog.LevelDebug
 	}
-	return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
+	return slog.New(slog.NewTextHandler(os.Stdout, opts))
 }
 
-func runRoot(cmd *cobra.Command, args []string) error {
-	logger := newLogger()
-
-	cfg, err := config.Load(configPath)
-	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
-	}
-
-	for _, m := range cfg.Mirrors {
-		if err := os.MkdirAll(m.Target, 0o755); err != nil {
-			return fmt.Errorf("creating target directory %s: %w", m.Target, err)
-		}
-	}
-
-	for _, m := range cfg.Mirrors {
-		if _, err := os.Stat(m.Source); err != nil {
-			logger.Warn("source not reachable at startup",
-				"mirror", m.Name,
-				"source", m.Source,
-				"error", err,
-			)
-		}
-	}
-
-	if once {
-		return runOnce(cfg, dryRun, logger)
-	}
-	return runDaemon(cfg, dryRun, logger)
-}
-
-func runOnce(cfg *config.Config, dryRun bool, logger *slog.Logger) error {
-	ctx := context.Background()
+func runOnce(ctx context.Context, cfg *config.Config, dryRun bool, logger *slog.Logger) error {
 	hasErrors := false
 
 	for _, mcfg := range cfg.Mirrors {
@@ -96,7 +91,7 @@ func runOnce(cfg *config.Config, dryRun bool, logger *slog.Logger) error {
 			Logger: logger,
 		}
 		result := m.RunOnce(ctx)
-		if result.Errors > 0 {
+		if len(result.Errors) > 0 {
 			hasErrors = true
 		}
 	}
@@ -107,51 +102,43 @@ func runOnce(cfg *config.Config, dryRun bool, logger *slog.Logger) error {
 	return nil
 }
 
-func runDaemon(cfg *config.Config, dryRun bool, logger *slog.Logger) error {
-	ctx, cancel := context.WithCancel(context.Background())
+func runDaemon(ctx context.Context, cfg *config.Config, dryRun bool, logger *slog.Logger) error {
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+	stopCh := make(chan os.Signal, 1)
+	signal.Notify(stopCh, syscall.SIGINT, syscall.SIGTERM)
 
-	sighupCh := make(chan os.Signal, 1)
-	signal.Notify(sighupCh, syscall.SIGHUP)
+	reloadCh := make(chan os.Signal, 1)
+	signal.Notify(reloadCh, syscall.SIGHUP)
 
 	var wg sync.WaitGroup
-	forceScanChs := make([]chan struct{}, len(cfg.Mirrors))
+	forceScan := mirror.NewBroadcast()
 
-	for i, mcfg := range cfg.Mirrors {
-		forceScanChs[i] = make(chan struct{}, 1)
+	for _, mcfg := range cfg.Mirrors {
 		m := &mirror.Mirror{
 			Config: mcfg,
 			DryRun: dryRun,
 			Logger: logger,
 		}
-		wg.Add(1)
-		go func(forceScan chan struct{}) {
-			defer wg.Done()
+		wg.Go(func() {
 			m.Run(ctx, forceScan)
-		}(forceScanChs[i])
+		})
 	}
 
 	logger.Info("shalott started", "mirrors", len(cfg.Mirrors))
 
 	for {
 		select {
-		case sig := <-sigCh:
+		case sig := <-stopCh:
 			logger.Info("received signal, shutting down", "signal", sig)
 			cancel()
 			wg.Wait()
 			logger.Info("shalott stopped")
 			return nil
-		case <-sighupCh:
+		case <-reloadCh:
 			logger.Info("received SIGHUP, forcing scan on all mirrors")
-			for _, ch := range forceScanChs {
-				select {
-				case ch <- struct{}{}:
-				default:
-				}
-			}
+			forceScan.Notify()
 		}
 	}
 }
