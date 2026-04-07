@@ -82,7 +82,7 @@ func newLogger() *slog.Logger {
 }
 
 func runOnce(ctx context.Context, cfg *config.Config, dryRun bool, logger *slog.Logger) error {
-	hasErrors := false
+	var errs []error
 
 	for _, mcfg := range cfg.Mirrors {
 		m := &mirror.Mirror{
@@ -91,23 +91,15 @@ func runOnce(ctx context.Context, cfg *config.Config, dryRun bool, logger *slog.
 			Logger: logger,
 		}
 		result := m.RunOnce(ctx)
-		if len(result.Errors) > 0 {
-			hasErrors = true
-		}
+		errs = append(errs, result.Errors...)
 	}
 
-	if hasErrors {
-		return errors.New("one or more mirrors encountered errors")
-	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func runDaemon(ctx context.Context, cfg *config.Config, dryRun bool, logger *slog.Logger) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	stopCh := make(chan os.Signal, 1)
-	signal.Notify(stopCh, syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	reloadCh := make(chan os.Signal, 1)
 	signal.Notify(reloadCh, syscall.SIGHUP)
@@ -130,9 +122,8 @@ func runDaemon(ctx context.Context, cfg *config.Config, dryRun bool, logger *slo
 
 	for {
 		select {
-		case sig := <-stopCh:
-			logger.Info("received signal, shutting down", "signal", sig)
-			cancel()
+		case <-ctx.Done():
+			logger.Info("received signal, shutting down")
 			wg.Wait()
 			logger.Info("shalott stopped")
 			return nil
