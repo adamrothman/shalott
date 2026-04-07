@@ -115,8 +115,8 @@ Each mirror runs in its own goroutine with an independent poll timer.
 
 **Per-tick scan:**
 
-1. **Health check** -- verify the source is reachable via `stat()`. If unreachable, skip the entire tick. Existing symlinks are never pruned when the source is down.
-2. **Scan** -- walk the source to the configured depth, collecting directories. Skip entries whose mtime is within the debounce window (still being written).
+1. **Health check** -- verify the source is reachable via `stat()`. If unreachable, skip the entire tick. Existing symlinks are never pruned when the source is down, as this would cause the watching application to delete its library metadata.
+2. **Scan** -- walk the source to the configured depth, collecting directories. Skip entries whose mtime is within the debounce window (still being written). The mtime naturally extends as new files are written, so large albums that take time to copy are handled correctly.
 3. **Diff** -- compare discovered directories against existing symlinks in the target.
 4. **Create** -- for each new directory, create parent dirs and a symlink.
 5. **Prune** -- for each orphaned symlink, remove it and clean up empty parent directories.
@@ -141,3 +141,9 @@ sudo systemctl enable --now shalott
 go test ./...                          # unit tests
 go test -tags integration ./...        # include integration tests
 ```
+
+## Future considerations
+
+- **Metrics** -- expose Prometheus metrics (symlinks created/pruned, scan duration, errors) if monitoring is added.
+- **Filesystem events** -- if the source is ever migrated to a local filesystem, shalott could use `fsnotify` instead of polling for lower latency.
+- **Config reload** -- watch the config file for changes and reload on `SIGHUP` (currently `SIGHUP` just forces a scan).
