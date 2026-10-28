@@ -44,7 +44,7 @@ jobs:
           mkdir dist
           for arch in amd64 arm64; do
             CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath \
-              -ldflags "-X github.com/adamrothman/shalott/cmd.version=$version" \
+              -ldflags "-s -w -X github.com/adamrothman/shalott/cmd.version=$version" \
               -o "dist/shalott_${version}_linux_${arch}" .
           done
           (cd dist && sha256sum shalott_* > SHA256SUMS)
