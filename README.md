@@ -28,6 +28,24 @@ Parent directories in the target are real local directories. Only the leaf entri
 
 ## Installation
 
+Download the binary for your platform from the
+[releases](https://github.com/adamrothman/shalott/releases), check it,
+and install it:
+
+```sh
+version=0.1.0
+platform=linux_amd64   # or linux_arm64
+file=shalott_${version}_${platform}
+base=https://github.com/adamrothman/shalott/releases/download/v$version
+curl -fsSLO "$base/$file" -O "$base/SHA256SUMS"
+sha256sum --check --ignore-missing SHA256SUMS
+gh attestation verify "$file" --repo adamrothman/shalott
+install -m 0755 "$file" /usr/local/bin/shalott
+```
+
+`gh attestation verify` checks that this repository's release workflow
+built the binary. Or install it with Go:
+
 ```
 go install github.com/adamrothman/shalott@latest
 ```
