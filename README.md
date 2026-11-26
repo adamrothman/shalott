@@ -103,7 +103,7 @@ mirrors:
 | `source`        | string   | yes      | --             | Absolute path to the remote/NFS mount                       |
 | `target`        | string   | yes      | --             | Absolute path to the local symlink tree                     |
 | `poll_interval` | duration | no       | `30s`          | How often to scan for changes                               |
-| `debounce`      | duration | no       | `2m`           | Ignore directories newer than this (still being copied)     |
+| `debounce`      | duration | no       | `2m`           | Ignore new directories modified more recently than this     |
 | `paths`         | list     | no       | `[{depth: 1}]` | Path configs; if omitted, mirrors direct children of source |
 
 ### Path fields
@@ -134,9 +134,9 @@ Each mirror runs in its own goroutine with an independent poll timer.
 **Per-tick scan:**
 
 1. **Health check** -- verify the source is reachable via `stat()`. If unreachable, skip the entire tick. Existing symlinks are never pruned when the source is down, as this would cause the watching application to delete its library metadata.
-2. **Scan** -- walk the source to the configured depth, collecting directories. Skip entries whose mtime is within the debounce window (still being written). The mtime naturally extends as new files are written, so large albums that take time to copy are handled correctly.
+2. **Scan** -- walk the source to the configured depth, collecting directories.
 3. **Diff** -- compare discovered directories against existing symlinks in the target.
-4. **Create** -- for each new directory, create parent dirs and a symlink.
+4. **Create** -- for each new directory, create parent dirs and a symlink. Skip directories whose mtime is within the debounce window (still being written); they are picked up on a later tick. The mtime naturally extends as new files are written, so large albums that take time to copy are handled correctly. Debounce only delays creation: a directory that is already linked stays linked when its contents change.
 5. **Prune** -- for each orphaned symlink, remove it and clean up empty parent directories.
 
 On startup, a full scan runs immediately before entering the poll loop, converging the target to match the current source state. The symlink tree _is_ the state -- no database needed.

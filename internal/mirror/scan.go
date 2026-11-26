@@ -5,13 +5,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"time"
 )
 
 // ScanSource walks sourceDir to exactly depth levels deep, returning absolute
-// paths of real directories found at that depth. Skips symlinks and directories
-// with mtime newer than now-debounce.
-func ScanSource(ctx context.Context, sourceDir string, depth int, debounce time.Duration, now time.Time) ([]string, error) {
+// paths of real directories found at that depth. Skips symlinks.
+func ScanSource(ctx context.Context, sourceDir string, depth int) ([]string, error) {
 	var results []string
 	err := walkToDepth(ctx, sourceDir, depth, func(path string, d fs.DirEntry) error {
 		if d.Type()&fs.ModeSymlink != 0 {
@@ -19,15 +17,6 @@ func ScanSource(ctx context.Context, sourceDir string, depth int, debounce time.
 		}
 		if !d.IsDir() {
 			return nil
-		}
-		if debounce > 0 {
-			info, err := d.Info()
-			if err != nil {
-				return nil
-			}
-			if now.Sub(info.ModTime()) < debounce {
-				return nil
-			}
 		}
 		results = append(results, path)
 		return nil
