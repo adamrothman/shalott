@@ -1,6 +1,6 @@
 module github.com/adamrothman/shalott
 
-go 1.26.1
+go 1.27.4
 
 require (
 	github.com/go-playground/validator/v10 v10.30.6
