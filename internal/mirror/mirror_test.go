@@ -95,6 +95,79 @@ func TestRunOnce_PrunesOrphans(t *testing.T) {
 	}
 }
 
+func TestRunOnce_DebouncesNewDirectories(t *testing.T) {
+	sourceDir := t.TempDir()
+	targetDir := t.TempDir()
+	mkdirs(t, sourceDir, []string{"settled", "still-copying"})
+
+	past := time.Now().Add(-10 * time.Minute)
+	os.Chtimes(filepath.Join(sourceDir, "settled"), past, past)
+
+	m := &mirror.Mirror{
+		Config: &config.Mirror{
+			Name:     "test",
+			Source:   sourceDir,
+			Target:   targetDir,
+			Debounce: time.Minute,
+			Paths: []config.Path{
+				{Prefix: "", Depth: 1},
+			},
+		},
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+
+	result := m.RunOnce(t.Context())
+
+	if result.Created != 1 {
+		t.Errorf("expected 1 created, got %d", result.Created)
+	}
+	if _, err := os.Lstat(filepath.Join(targetDir, "settled")); err != nil {
+		t.Errorf("settled directory should be linked: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(targetDir, "still-copying")); !os.IsNotExist(err) {
+		t.Error("directory within the debounce window should not be linked yet")
+	}
+}
+
+func TestRunOnce_KeepsSymlinkWhenSourceModified(t *testing.T) {
+	sourceDir := t.TempDir()
+	targetDir := t.TempDir()
+	mkdirs(t, sourceDir, []string{"album"})
+
+	album := filepath.Join(sourceDir, "album")
+	past := time.Now().Add(-10 * time.Minute)
+	os.Chtimes(album, past, past)
+
+	m := &mirror.Mirror{
+		Config: &config.Mirror{
+			Name:     "test",
+			Source:   sourceDir,
+			Target:   targetDir,
+			Debounce: time.Minute,
+			Paths: []config.Path{
+				{Prefix: "", Depth: 1},
+			},
+		},
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+	m.RunOnce(t.Context())
+
+	// Adding a file to an already-mirrored directory bumps its mtime back
+	// inside the debounce window.
+	if err := os.WriteFile(filepath.Join(album, "bonus-track.flac"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := m.RunOnce(t.Context())
+
+	if result.Pruned != 0 {
+		t.Errorf("expected 0 pruned, got %d", result.Pruned)
+	}
+	if _, err := os.Lstat(filepath.Join(targetDir, "album")); err != nil {
+		t.Errorf("symlink should survive a change to its source directory: %v", err)
+	}
+}
+
 func TestRunOnce_SourceUnreachable(t *testing.T) {
 	targetDir := t.TempDir()
 

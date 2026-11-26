@@ -61,7 +61,7 @@ func (m *Mirror) RunOnce(ctx context.Context) ScanResult {
 func (m *Mirror) syncPath(ctx context.Context, sourceDir, targetDir string, pathCfg config.Path, now time.Time) ScanResult {
 	var result ScanResult
 
-	scanned, err := ScanSource(ctx, sourceDir, pathCfg.Depth, m.Config.Debounce, now)
+	scanned, err := ScanSource(ctx, sourceDir, pathCfg.Depth)
 	if err != nil {
 		m.Logger.Error("scan failed, skipping path",
 			"mirror", m.Config.Name,
@@ -97,6 +97,9 @@ func (m *Mirror) syncPath(ctx context.Context, sourceDir, targetDir string, path
 	}
 
 	for _, e := range diff.New {
+		if !settled(e.SourcePath, m.Config.Debounce, now) {
+			continue
+		}
 		if err := Create(e, m.DryRun, m.Logger); err != nil {
 			m.Logger.Error("failed to create symlink",
 				"mirror", m.Config.Name,
@@ -123,6 +126,14 @@ func (m *Mirror) syncPath(ctx context.Context, sourceDir, targetDir string, path
 	}
 
 	return result
+}
+
+// settled reports whether dir was last modified at least debounce ago, meaning
+// nothing is still being copied into it. Only new directories wait for this:
+// one that is already linked stays linked however recently it changed.
+func settled(dir string, debounce time.Duration, now time.Time) bool {
+	info, err := os.Stat(dir)
+	return err == nil && now.Sub(info.ModTime()) >= debounce
 }
 
 // Run starts the daemon loop, scanning on the configured interval.
