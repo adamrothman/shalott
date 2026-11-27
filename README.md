@@ -33,7 +33,8 @@ Download the binary for your platform from the
 and install it:
 
 ```sh
-version=0.1.0
+# The latest release; set this yourself to install another.
+version=$(gh release view --repo adamrothman/shalott --json tagName --jq '.tagName | ltrimstr("v")')
 platform=linux_amd64   # or linux_arm64
 file=shalott_${version}_${platform}
 base=https://github.com/adamrothman/shalott/releases/download/v$version
@@ -159,6 +160,21 @@ sudo systemctl enable --now shalott
 go test ./...                          # unit tests
 go test -tags integration ./...        # include integration tests
 ```
+
+## Releasing
+
+Pushing a version tag publishes a release. Tag a commit on `main`:
+
+```sh
+tag=vX.Y.Z
+git switch main && git pull
+git tag -a "$tag" -m "$tag"
+git push origin "$tag"
+```
+
+The [release workflow](.github/workflows/release.yml) then runs the tests, builds the `linux_amd64` and `linux_arm64` binaries with the Go version in `go.mod`, attests their build provenance, and publishes them with `SHA256SUMS` and generated notes. The version a binary reports comes from the tag.
+
+Releases are immutable: once one is published, its tag and assets cannot be changed. Fix a bad release by tagging a new version.
 
 ## Future considerations
 
